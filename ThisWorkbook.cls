@@ -1,12 +1,3 @@
-VERSION 1.0 CLASS
-BEGIN
-  MultiUse = -1  'True
-END
-Attribute VB_Name = "ThisWorkbook"
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = False
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = True
 Option Explicit
 Private Sub Workbook_Open()
     guaranteeSheet "data"
@@ -14,6 +5,12 @@ Private Sub Workbook_Open()
     guaranteeSheet "Weekly"
     
     AssignWorksheetGlobals
+End Sub
+
+Private Sub Workbook_SheetActivate(ByVal Sh As Object)
+    If Sh.Name = "Weekly" Then
+        CreateWeekly
+    End If
 End Sub
 
 Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
@@ -27,26 +24,23 @@ Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
     Dim ID As String
 
     If Target.Rows.Count < 100 And Sh.Name = "data" Then
-        Debug.Print ("here!")
         For Each currRow In Target.Rows
-            ID = Sh.Cells(currRow.row, "D").Value
+            ID = Sh.Cells(currRow.Row, "E").Value
             targetRow = GetTodayRowWithID(ID)
-            
-            Debug.Print (targetRow)
 
             If targetRow >= 0 Then
-                CopyRowToToday currRow.row, targetRow
+                CopyRowToToday currRow.Row, targetRow
             End If
         Next
     End If
     
     If Target.Rows.Count < 100 And Sh.Name = "Today" Then
         For Each currRow In Target.Rows
-            ID = Sh.Cells(currRow.row, "E").Value
+            ID = Sh.Cells(currRow.Row, "E").Value
             targetRow = GetDataRowWithID(ID)
 
             If targetRow >= 0 Then
-                CopyRowToData currRow.row, targetRow
+                CopyRowToData currRow.Row, targetRow
             End If
         Next
     End If
