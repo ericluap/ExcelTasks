@@ -1,9 +1,8 @@
-Attribute VB_Name = "Module1"
 Option Explicit
 
 Dim dataSheet As Worksheet
 Dim todaySheet As Worksheet
-Dim weekSheet As Worksheet
+Dim weeklySheet As Worksheet
 
 Function GetRowWithValueInColumn(ws As Worksheet, col As Integer, val As String)
     AssignWorksheetGlobals
@@ -30,7 +29,7 @@ End Function
 Function GetDataRowWithID(ID As String) As Long
     AssignWorksheetGlobals
     
-    GetDataRowWithID = GetRowWithValueInColumn(dataSheet, 4, ID)
+    GetDataRowWithID = GetRowWithValueInColumn(dataSheet, 5, ID)
 End Function
 
 Sub guaranteeSheet(sheetName As String)
@@ -53,14 +52,14 @@ End Function
 Sub AssignWorksheetGlobals()
     Set dataSheet = Worksheets("data")
     Set todaySheet = Worksheets("Today")
-    Set weekSheet = Worksheets("Weekly")
+    Set weeklySheet = Worksheets("Weekly")
 End Sub
 
 Function NumOfRows(ws As Worksheet) As Long
     Dim totalRow As Long
     
     With ws
-        totalRow = .Range("B" & .Rows.Count).End(xlUp).row
+        totalRow = .Range("B" & .Rows.Count).End(xlUp).Row
     End With
     
     NumOfRows = totalRow
@@ -114,7 +113,7 @@ Sub calledCheckbox()
     Dim nameRow As String
     
     Set cb = todaySheet.CheckBoxes(Application.Caller)
-    targetRow = cb.TopLeftCell.row + 1
+    targetRow = cb.TopLeftCell.Row + 1
 
     If cb.Value = 1 Then
         todaySheet.Range("A" & targetRow, "H" & targetRow).Interior.ColorIndex = 15
@@ -131,7 +130,7 @@ Sub closeCheckbox()
     Dim dataRow As Integer
     
     Set cb = todaySheet.CheckBoxes(Application.Caller)
-    targetRow = cb.TopLeftCell.row + 1
+    targetRow = cb.TopLeftCell.Row + 1
     
     ID = todaySheet.Range("E" & targetRow).Value
     
@@ -142,15 +141,31 @@ Sub closeCheckbox()
     
 End Sub
 
+Function GetNameRow(cbName As String) As Integer
+    Dim lastDollarSign As Integer
+    lastDollarSign = InStrRev(cbName, "$", -1, vbTextCompare)
+    
+    GetNameRow = CInt(Right(cbName, Len(cbName) - lastDollarSign))
+End Function
+
+Function ChangeNameRow(cbName As String, newRow As Integer) As String
+    Dim lastDollarSign As Integer
+    lastDollarSign = InStrRev(cbName, "$", -1, vbTextCompare)
+    
+    ChangeNameRow = Left(cbName, lastDollarSign) & newRow
+End Function
+
 Sub doneCheckbox()
+    AssignWorksheetGlobals
+    
     Dim cb As CheckBox
     Dim targetRow As Integer
     Dim nameRow As String
     
     Set cb = todaySheet.CheckBoxes(Application.Caller)
-    targetRow = cb.TopLeftCell.row + 1
+    targetRow = cb.TopLeftCell.Row + 1
     
-    nameRow = Right(cb.Name, 1)
+    nameRow = GetNameRow(cb.Name)
     
     With cb
         If .Value = 1 Then
@@ -163,8 +178,14 @@ Sub doneCheckbox()
             
             Dim box As CheckBox
             For Each box In todaySheet.CheckBoxes
-                If box.TopLeftCell.row >= targetRow Then
-                    box.Top = box.TopLeftCell.Top + box.TopLeftCell.Height / 2 - box.Height / 2
+                If box.TopLeftCell.Row >= targetRow Then
+                    If GetNameRow(box.Name) <> (box.TopLeftCell.Row + 1) Then
+                        box.Name = ChangeNameRow(box.Name, GetNameRow(box.Name) - 2)
+                    End If
+                    
+                    If GetNameRow(box.Name) <> (box.TopLeftCell.Row + 1) Then
+                        box.Top = box.TopLeftCell.Top + box.TopLeftCell.Height / 2 - box.Height / 2
+                    End If
                 End If
             Next
             
@@ -177,8 +198,10 @@ Sub doneCheckbox()
 End Sub
 
 Sub AddCheckbox(c As Range, caption As String, Optional action As String = "")
+    AssignWorksheetGlobals
+    
     Dim cb As CheckBox
-    Set cb = todaySheet.CheckBoxes.Add(0, 1, 100, 0)
+    Set cb = todaySheet.CheckBoxes.Add(0, 1, 100, 20)
     
     With cb
         .caption = caption
@@ -195,8 +218,13 @@ End Sub
 Sub CopyRowToToday(rowNum As Long, targetRow As Long)
     'dataSheet.Range("A" & rowNum, "D" & rowNum).Copy todaySheet.Range("B" & targetRow)
     Dim i As Integer
-    For i = 1 To 4
-        todaySheet.Cells(targetRow, i + 1).Value = dataSheet.Cells(rowNum, i).Value
+    For i = 1 To 5
+        If i < 3 Then
+            todaySheet.Cells(targetRow, i + 1).Value = dataSheet.Cells(rowNum, i).Value
+        End If
+        If i > 3 Then
+            todaySheet.Cells(targetRow, i).Value = dataSheet.Cells(rowNum, i).Value
+        End If
     Next i
 End Sub
 
@@ -204,6 +232,85 @@ Sub CopyRowToData(rowNum As Long, targetRow As Long)
     'todaySheet.Range("B" & rowNum, "E" & rowNum).Copy dataSheet.Range("A" & targetRow)
     Dim i As Integer
     For i = 2 To 5
-        dataSheet.Cells(targetRow, i - 1).Value = todaySheet.Cells(rowNum, i).Value
+        If i < 4 Then
+            dataSheet.Cells(targetRow, i - 1).Value = todaySheet.Cells(rowNum, i).Value
+        End If
+        If i >= 4 Then
+            dataSheet.Cells(targetRow, i).Value = todaySheet.Cells(rowNum, i).Value
+        End If
     Next i
+End Sub
+
+Sub CreateWeekly()
+    AssignWorksheetGlobals
+    
+    ClearWeekly
+    
+    Dim actualDay As Integer
+    actualDay = Weekday(Date)
+    
+    Dim sundayDelta As Integer
+    sundayDelta = 1 - actualDay
+    
+    Dim saturdayDelta As Integer
+    saturdayDelta = 7 - actualDay
+    
+    Dim i As Integer
+    Dim currCol As Integer
+    currCol = 1
+    Dim currDate As Date
+    Dim nextWeekDate As Date
+    
+    For i = sundayDelta To saturdayDelta
+        currDate = DateAdd("d", i, Date)
+        AddToWeekly currDate, currCol
+        
+        nextWeekDate = DateAdd("ww", 1, currDate)
+        AddToWeekly nextWeekDate, currCol + 16
+        
+        currCol = currCol + 2
+    Next i
+End Sub
+
+Sub ClearWeekly()
+    Dim numRows As Integer
+    Dim currCol As Integer
+    currCol = 1
+    
+    Do While currCol <= 35
+        weeklySheet.Range(Cells(3, currCol), Cells(50, currCol)).Clear
+        
+        currCol = currCol + 2
+    Loop
+
+End Sub
+
+Sub AddToWeekly(targetDate As Date, targetCol As Integer)
+    Application.EnableEvents = False
+    On Error GoTo ERR_HANDLE
+    
+    AssignWorksheetGlobals
+    
+    Dim totalTasks As Long
+    totalTasks = NumOfRows(dataSheet)
+    
+    Dim i As Long
+    Dim targetRow As Long
+    targetRow = 3
+    
+    For i = 1 To totalTasks
+        With dataSheet
+            If .Range("A" & i).Value = targetDate Then
+                CopyNameToWeekly i, CLng(targetRow), targetCol
+                
+                targetRow = targetRow + 1
+            End If
+        End With
+    Next i
+ERR_HANDLE:
+    Application.EnableEvents = True
+End Sub
+
+Sub CopyNameToWeekly(dataRow As Long, targetRow As Integer, targetCol As Integer)
+    weeklySheet.Cells(targetRow, targetCol).Value = dataSheet.Range("D" & dataRow)
 End Sub
